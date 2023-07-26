@@ -33,10 +33,15 @@
  */
 package fr.paris.lutece.plugins.spring.extension.service;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Map;
 import java.util.Set;
 
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.GenericWebApplicationContext;
 
 import fr.paris.lutece.portal.service.init.AppInit;
@@ -46,7 +51,10 @@ import fr.paris.lutece.portal.service.util.AppLogService;
 import fr.paris.lutece.portal.service.util.AppPathService;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.context.Initialized;
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.enterprise.context.SessionScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.literal.NamedLiteral;
 import jakarta.enterprise.inject.spi.AfterBeanDiscovery;
@@ -56,6 +64,7 @@ import jakarta.enterprise.inject.spi.BeforeBeanDiscovery;
 import jakarta.enterprise.inject.spi.Extension;
 import jakarta.enterprise.inject.spi.InjectionTarget;
 import jakarta.enterprise.inject.spi.InjectionTargetFactory;
+import jakarta.inject.Singleton;
 import jakarta.servlet.ServletContext;
 
 /**
@@ -65,6 +74,13 @@ import jakarta.servlet.ServletContext;
  */
 public class SpringExtension implements Extension
 {
+	private static Map<String, Class<? extends Annotation>> scopes = Map.of(
+			"application",ApplicationScoped.class,
+			"session",SessionScoped.class,
+			"request",RequestScoped.class,
+			"singleton",ApplicationScoped.class,
+			"prototype",Dependent.class
+			);
 
     /**
      * init PropertiesServices before BeanDiscovery cdi event
@@ -103,10 +119,16 @@ public class SpringExtension implements Extension
                 final InjectionTargetFactory<Object> injectionTargetFactory = bm.getInjectionTargetFactory( at );
                 // final InjectionTarget<Object> injectionTarget= bm.createInjectionTarget(at);
                 final InjectionTarget<Object> injectionTarget = injectionTargetFactory.createInjectionTarget( null );
-                // abd.addBean(new SpringBean<Object>(ctx, clazz, id, injectionTarget.configure()..createInjectionTarget(null)));
-
-                abd.addBean( ).beanClass( clazz ).name( id ).addInjectionPoints( injectionTarget.getInjectionPoints( ) ).addTypes( getAllSuperclasses( clazz ) )
-                        .addQualifier( NamedLiteral.of( id ) ).createWith( tCreationalContext -> {
+	                // abd.addBean(new SpringBean<Object>(ctx, clazz, id, injectionTarget.configure()..createInjectionTarget(null)));
+                Class<? extends Annotation> scope= scopes.get(ctx.getBeanDefinition(id).getScope());
+                abd.addBean( )
+                		.beanClass( clazz )
+                		.name( id )
+                		.addInjectionPoints( injectionTarget.getInjectionPoints( ) )
+                		.addTypes( getAllSuperclasses( clazz ) )
+                        .addQualifier( NamedLiteral.of( id ) )
+                        .scope( scope!=null?scope:Dependent.class )
+                        .createWith( tCreationalContext -> {
                             // Object instance = injectionTarget.produce(tCreationalContext);
                             Object instance = SpringContextService.getBean( id, clazz );
                             injectionTarget.inject( instance, tCreationalContext );
