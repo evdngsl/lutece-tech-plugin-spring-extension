@@ -42,6 +42,7 @@ import java.util.Map;
 
 import jakarta.servlet.ServletContext;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -270,7 +271,7 @@ public final class SpringContextService implements PluginEventListener
         // The list is not in the cache, so we have to build it
         list = new ArrayList<>( );
 
-        Map<String, T> map = _context.getBeansOfType( classDef );
+        Map<String, T> map = BeanFactoryUtils.beansOfTypeIncludingAncestors(_context, classDef );
         String [ ] sBeanNames = map.keySet( ).toArray( new String [ map.size( )] );
 
         for ( String strBeanName : sBeanNames )

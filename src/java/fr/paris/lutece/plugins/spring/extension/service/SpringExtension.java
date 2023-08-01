@@ -78,7 +78,7 @@ public class SpringExtension implements Extension
 			"application",ApplicationScoped.class,
 			"session",SessionScoped.class,
 			"request",RequestScoped.class,
-			"singleton",ApplicationScoped.class,
+			"singleton",Singleton.class,
 			"prototype",Dependent.class
 			);
 
