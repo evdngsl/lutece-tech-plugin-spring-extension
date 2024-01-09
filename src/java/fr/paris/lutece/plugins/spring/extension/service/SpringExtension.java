@@ -35,6 +35,8 @@ package fr.paris.lutece.plugins.spring.extension.service;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
@@ -90,6 +92,11 @@ public class SpringExtension implements Extension
      */
     protected void initPropertiesServices( @Observes final BeforeBeanDiscovery bd )
     {
+    	if(Files.notExists(Paths.get(AppPathService.getWebAppPath( )+"/WEB-INF/conf/")))
+    	{
+    		String _strResourcesDir = getClass( ).getResource( "/" ).toString( ).replaceFirst( "file:", "" ).replaceFirst( "classes", "lutece" );
+             AppPathService.init( _strResourcesDir );
+    	}
         AppInit.initPropertiesServices( "/WEB-INF/conf/", AppPathService.getWebAppPath( ) );
 
     }
