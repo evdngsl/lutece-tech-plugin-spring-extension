@@ -35,22 +35,14 @@ package fr.paris.lutece.plugins.spring.extension.service;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
-
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.GenericWebApplicationContext;
 
-import fr.paris.lutece.portal.service.init.AppInit;
 import fr.paris.lutece.portal.service.init.LuteceInitException;
 import fr.paris.lutece.portal.service.spring.SpringContextService;
 import fr.paris.lutece.portal.service.util.AppLogService;
-import fr.paris.lutece.portal.service.util.AppPathService;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.Dependent;
@@ -62,7 +54,6 @@ import jakarta.enterprise.inject.literal.NamedLiteral;
 import jakarta.enterprise.inject.spi.AfterBeanDiscovery;
 import jakarta.enterprise.inject.spi.AnnotatedType;
 import jakarta.enterprise.inject.spi.BeanManager;
-import jakarta.enterprise.inject.spi.BeforeBeanDiscovery;
 import jakarta.enterprise.inject.spi.Extension;
 import jakarta.enterprise.inject.spi.InjectionTarget;
 import jakarta.enterprise.inject.spi.InjectionTargetFactory;
@@ -83,24 +74,6 @@ public class SpringExtension implements Extension
 			"singleton",Singleton.class,
 			"prototype",Dependent.class
 			);
-
-    /**
-     * init PropertiesServices before BeanDiscovery cdi event
-     * 
-     * @param bd
-     *            the BeforeBeanDiscovery event
-     */
-    protected void initPropertiesServices( @Observes final BeforeBeanDiscovery bd )
-    {
-    	if(Files.notExists(Paths.get(AppPathService.getWebAppPath( )+"/WEB-INF/conf/")))
-    	{
-    		String _strResourcesDir = getClass( ).getResource( "/" ).toString( ).replaceFirst( "file:", "" ).replaceFirst( "classes", "lutece" );
-             AppPathService.init( _strResourcesDir );
-    	}
-        AppInit.initPropertiesServices( "/WEB-INF/conf/", AppPathService.getWebAppPath( ) );
-
-    }
-
     /**
      * Registration of beans instantiated by the Spring container in the CDI container.
      * 
@@ -113,7 +86,7 @@ public class SpringExtension implements Extension
      */
     protected void addSpringBeansToCdi( @Observes final AfterBeanDiscovery abd, final BeanManager bm ) throws LuteceInitException
     {
-        AppLogService.info( "Loading context files ..." );
+        AppLogService.info( "Loading spring context files ..." );
         SpringContextService.initParentContext( );
         GenericWebApplicationContext ctx = (GenericWebApplicationContext) SpringContextService.getParentContext( );
         if ( ctx != null )
@@ -167,7 +140,6 @@ public class SpringExtension implements Extension
     protected void initializedSpringContext( @Observes @Initialized( ApplicationScoped.class ) @Priority( value = 2 ) ServletContext context )
             throws LuteceInitException
     {
-
         SpringContextService.init( context );
     }
 
