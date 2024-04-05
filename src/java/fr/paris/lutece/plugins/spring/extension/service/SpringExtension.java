@@ -46,6 +46,7 @@ import fr.paris.lutece.portal.service.util.AppLogService;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.context.Destroyed;
 import jakarta.enterprise.context.Initialized;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.enterprise.context.SessionScoped;
@@ -141,6 +142,14 @@ public class SpringExtension implements Extension
             throws LuteceInitException
     {
         SpringContextService.init( context );
+    }
+    /**
+	 * Shutdown the application
+	 * @param destroyed context event
+	 */
+    public void contextDestroyed(@Observes @Destroyed(ApplicationScoped.class) @Priority( value = 2 )
+	ServletContext context){
+    	SpringContextService.shutdown( );
     }
 
     /**
