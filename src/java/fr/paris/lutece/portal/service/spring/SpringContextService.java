@@ -53,6 +53,7 @@ import fr.paris.lutece.portal.service.plugin.Plugin;
 import fr.paris.lutece.portal.service.plugin.PluginEvent;
 import fr.paris.lutece.portal.service.plugin.PluginEventListener;
 import fr.paris.lutece.portal.service.plugin.PluginService;
+import fr.paris.lutece.portal.service.plugin.LegacyPluginEventObserver;
 import fr.paris.lutece.portal.service.util.AppLogService;
 import fr.paris.lutece.portal.service.util.AppPathService;
 
@@ -151,7 +152,7 @@ public final class SpringContextService implements PluginEventListener
         try
         {
             // Register this service as a PluginEventListener
-            PluginService.registerPluginEventListener( _instance );
+            LegacyPluginEventObserver.registerPluginEventListener( _instance );
             GenericWebApplicationContext gwac = new GenericWebApplicationContext( servletContext );
             gwac.setParent( _parentcontext );
             gwac.setId( getContextName( servletContext ) );

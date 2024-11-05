@@ -35,7 +35,7 @@ package fr.paris.lutece.portal.service.database;
 
 import fr.paris.lutece.portal.service.plugin.PluginEvent;
 import fr.paris.lutece.portal.service.plugin.PluginEventListener;
-import fr.paris.lutece.portal.service.plugin.PluginService;
+import fr.paris.lutece.portal.service.plugin.LegacyPluginEventObserver;
 import fr.paris.lutece.util.sql.TransactionManager;
 
 import org.apache.commons.lang3.StringUtils;
@@ -64,11 +64,11 @@ public class DAOUtilTransactionManager extends DataSourceTransactionManager impl
     private boolean _bInit;
 
     /**
-     * Registers the listener to {@link PluginService}.
+     * Registers the listener to {@link LegacyPluginEventObserver}.
      */
     public DAOUtilTransactionManager( )
     {
-        PluginService.registerPluginEventListener( this );
+        LegacyPluginEventObserver.registerPluginEventListener( this );
     }
 
     /**
