@@ -37,8 +37,10 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import jakarta.servlet.ServletContext;
 import org.apache.commons.lang3.StringUtils;
@@ -49,13 +51,13 @@ import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.web.context.support.GenericWebApplicationContext;
 
 import fr.paris.lutece.portal.service.init.LuteceInitException;
+import fr.paris.lutece.portal.service.init.WebConfResourceLocator;
 import fr.paris.lutece.portal.service.plugin.Plugin;
 import fr.paris.lutece.portal.service.plugin.PluginEvent;
 import fr.paris.lutece.portal.service.plugin.PluginEventListener;
 import fr.paris.lutece.portal.service.plugin.PluginService;
 import fr.paris.lutece.portal.service.plugin.LegacyPluginEventObserver;
 import fr.paris.lutece.portal.service.util.AppLogService;
-import fr.paris.lutece.portal.service.util.AppPathService;
 
 /**
  * This class provides a way to use Spring Framework ligthweight containers offering IoC (Inversion of Control) features.
@@ -66,9 +68,6 @@ public final class SpringContextService implements PluginEventListener
 {
     private static final String PROTOCOL_FILE = "file:";
     private static final String PATH_CONF = "/WEB-INF/conf/";
-    private static final String DIR_PLUGINS = "plugins/";
-    private static final String DIR_OVERRIDE = "override/";
-    private static final String DIR_OVERRIDE_PLUGINS = DIR_OVERRIDE + DIR_PLUGINS;
     private static final String SUFFIX_CONTEXT_FILE = "_context.xml";
     private static final String FILE_CORE_CONTEXT = "core_context.xml";
     private static ApplicationContext _context;
@@ -214,6 +213,38 @@ public final class SpringContextService implements PluginEventListener
             {
                 String [ ] file = {
                         PROTOCOL_FILE + strConfPluginsPath + fileContext
+                };
+
+                // Safe loading of plugin context file
+                try
+                {
+                    xmlReader.loadBeanDefinitions( file );
+                    AppLogService.info( "Context file loaded : {}", fileContext );
+                }
+                catch( Exception e )
+                {
+                    AppLogService.error( "Unable to load Spring context file : {} - cause :  {}", fileContext, e.getMessage( ), e );
+                }
+            }
+        }
+    }
+    
+    /**
+     * Loads plugins contexts.
+     * 
+     * @param filesContext
+     *            context files paths
+     * @param xmlReader
+     *            the xml reader
+     */
+    public static void loadContexts( Set<String> filesContext, XmlBeanDefinitionReader xmlReader )
+    {
+        if ( filesContext != null )
+        {
+            for ( String fileContext : filesContext )
+            {
+                String [ ] file = {
+                        PROTOCOL_FILE + fileContext
                 };
 
                 // Safe loading of plugin context file
@@ -383,8 +414,7 @@ public final class SpringContextService implements PluginEventListener
         try
         {
             // Load the core context file : core_context.xml
-            String strConfPath = AppPathService.getAbsolutePathFromRelativePath( PATH_CONF );
-            String strContextFile = "file:" + strConfPath + FILE_CORE_CONTEXT;
+            String strContextFile = PROTOCOL_FILE + Thread.currentThread( ).getContextClassLoader( ).getResource( PATH_CONF + FILE_CORE_CONTEXT ).getPath( );
 
             GenericWebApplicationContext gwac = new GenericWebApplicationContext( );
 
@@ -392,42 +422,24 @@ public final class SpringContextService implements PluginEventListener
             xmlReader.loadBeanDefinitions( strContextFile );
             AppLogService.info( "Context file loaded : {}", FILE_CORE_CONTEXT );
 
-            // Load all context files found in the conf/plugins directory
-            // Files are loaded separatly with an individual try/catch block
+            // Load all context files found in the web conf resources
+            // Files are loaded separately with an individual try/catch block
             // to avoid stopping the process in case of a failure
             // The global context generation will fail if a bean in any file cannot be
             // built.
-            String strConfPluginsPath = strConfPath + DIR_PLUGINS;
-            File dirConfPlugins = new File( strConfPluginsPath );
-            FilenameFilter filterContext = new ContextFileFilter( );
-            String [ ] filesContext = dirConfPlugins.list( filterContext );
-
-            SpringContextService.loadContexts( filesContext, strConfPluginsPath, xmlReader );
-
-            // we now load overriding beans
-            AppLogService.info( "Loading plugins context overrides" );
-
-            String strCoreContextOverrideFile = strConfPath + DIR_OVERRIDE + FILE_CORE_CONTEXT;
-            File fileCoreContextOverride = new File( strCoreContextOverrideFile );
-
-            if ( fileCoreContextOverride.exists( ) )
+            Set<String> xmlFilePaths = WebConfResourceLocator.getPathXmlFile( );
+            Set<String> filesContext = new HashSet<String>( );
+            for ( String xmlFilePath : xmlFilePaths )
             {
-                AppLogService.debug( "Context file loaded : core_context" );
-                xmlReader.loadBeanDefinitions( PROTOCOL_FILE + strCoreContextOverrideFile );
-            }
-            else
-            {
-                AppLogService.debug( "No core_context override found" );
+                if ( xmlFilePath.endsWith( SUFFIX_CONTEXT_FILE ) )
+                {
+                    filesContext.add( Thread.currentThread( ).getContextClassLoader( ).getResource( xmlFilePath ).getPath( ) );
+                }
             }
 
-            // load plugins overrides
-            String strConfPluginsOverridePath = strConfPath + DIR_OVERRIDE_PLUGINS;
-            File dirConfOverridePlugins = new File( strConfPluginsOverridePath );
-
-            if ( dirConfOverridePlugins.exists( ) )
+            if ( !filesContext.isEmpty( ) )
             {
-                String [ ] filesOverrideContext = dirConfOverridePlugins.list( filterContext );
-                SpringContextService.loadContexts( filesOverrideContext, strConfPluginsOverridePath, xmlReader );
+                SpringContextService.loadContexts( filesContext, xmlReader );
             }
 
             gwac.refresh( );
