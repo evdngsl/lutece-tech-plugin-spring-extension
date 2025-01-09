@@ -58,7 +58,6 @@ import jakarta.enterprise.inject.spi.BeanManager;
 import jakarta.enterprise.inject.spi.Extension;
 import jakarta.enterprise.inject.spi.InjectionTarget;
 import jakarta.enterprise.inject.spi.InjectionTargetFactory;
-import jakarta.inject.Singleton;
 import jakarta.servlet.ServletContext;
 
 /**
@@ -72,7 +71,7 @@ public class SpringExtension implements Extension
 			"application",ApplicationScoped.class,
 			"session",SessionScoped.class,
 			"request",RequestScoped.class,
-			"singleton",Singleton.class,
+			"singleton",ApplicationScoped.class,
 			"prototype",Dependent.class
 			);
     /**
@@ -102,13 +101,18 @@ public class SpringExtension implements Extension
                 final InjectionTarget<Object> injectionTarget = injectionTargetFactory.createInjectionTarget( null );
 	                // abd.addBean(new SpringBean<Object>(ctx, clazz, id, injectionTarget.configure()..createInjectionTarget(null)));
                 Class<? extends Annotation> scope= scopes.get(ctx.getBeanDefinition(id).getScope());
+
+                if (!bm.getBeans( id ).isEmpty( )) {
+                    break;
+                }
+
                 abd.addBean( )
                 		.beanClass( clazz )
                 		.name( id )
                 		.addInjectionPoints( injectionTarget.getInjectionPoints( ) )
                 		.addTypes( getAllSuperclasses( clazz ) )
                         .addQualifier( NamedLiteral.of( id ) )
-                        .scope( scope!=null?scope:Dependent.class )
+                        .scope( scope!=null?scope:ApplicationScoped.class )
                         .createWith( tCreationalContext -> {
                             // Object instance = injectionTarget.produce(tCreationalContext);
                             Object instance = SpringContextService.getBean( id, clazz );
@@ -177,6 +181,10 @@ public class SpringExtension implements Extension
         while ( superclass != null && superclass != Object.class )
         {
             classes.add( superclass );
+            for ( Class superInterface : superclass.getInterfaces( ) )
+            {
+                classes.add( superInterface );                
+            }
             superclass = superclass.getSuperclass( );
         }
         return classes;

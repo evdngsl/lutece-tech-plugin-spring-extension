@@ -35,16 +35,19 @@ package fr.paris.lutece.portal.service.spring;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import jakarta.servlet.ServletContext;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.BeanFactoryUtils;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -52,12 +55,20 @@ import org.springframework.web.context.support.GenericWebApplicationContext;
 
 import fr.paris.lutece.portal.service.init.LuteceInitException;
 import fr.paris.lutece.portal.service.init.WebConfResourceLocator;
+import fr.paris.lutece.portal.service.plugin.LegacyPluginEventObserver;
 import fr.paris.lutece.portal.service.plugin.Plugin;
 import fr.paris.lutece.portal.service.plugin.PluginEvent;
 import fr.paris.lutece.portal.service.plugin.PluginEventListener;
 import fr.paris.lutece.portal.service.plugin.PluginService;
-import fr.paris.lutece.portal.service.plugin.LegacyPluginEventObserver;
 import fr.paris.lutece.portal.service.util.AppLogService;
+import fr.paris.lutece.portal.service.util.AppPathService;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.inject.spi.Bean;
+import jakarta.enterprise.inject.spi.BeanManager;
+import jakarta.enterprise.inject.spi.CDI;
+import jakarta.inject.Named;
+import jakarta.servlet.ServletContext;
 
 /**
  * This class provides a way to use Spring Framework ligthweight containers offering IoC (Inversion of Control) features.
@@ -414,9 +425,65 @@ public final class SpringContextService implements PluginEventListener
         try
         {
             // Load the core context file : core_context.xml
-            String strContextFile = PROTOCOL_FILE + Thread.currentThread( ).getContextClassLoader( ).getResource( PATH_CONF + FILE_CORE_CONTEXT ).getPath( );
+            String strContextFile = null;
+            URL strContextFileUrl = Thread.currentThread( ).getContextClassLoader( ).getResource( PATH_CONF + FILE_CORE_CONTEXT );
+            if ( null != strContextFileUrl )
+            {
+                strContextFile = PROTOCOL_FILE + strContextFileUrl.getPath( );
+            }
+            else
+            {
+                // This is to load core_context.xml file in tests unit scenario with lutece-exploded goal
+                strContextFile = PROTOCOL_FILE + AppPathService.getWebAppPath( ) + PATH_CONF + FILE_CORE_CONTEXT;
+            }
 
             GenericWebApplicationContext gwac = new GenericWebApplicationContext( );
+            
+            // Try to register Lutece CDI beans (Application & Dependent scoped) in the Spring context
+            try 
+            {
+                BeanManager beanManager = CDI.current( ).getBeanManager( );
+                beanManager.getBeans( Object.class ).forEach( bean -> {
+                    if ( bean.getBeanClass( ).getPackageName( ).startsWith( "fr.paris." ) )
+                    {
+                        Optional<Named> named = bean.getQualifiers( ).stream( )
+                                .filter( a -> a instanceof Named )
+                                .map( a -> (Named) a )
+                                //.filter( n -> n.value( ).contains( "." ) && !n.value( ).contains( "xpage" ) )
+                                .findFirst( );
+                        if ( named.isPresent( ) )
+                        {
+                            String beanName = named.get( ).value( );
+                            if ( bean.getScope( ).isAssignableFrom( ApplicationScoped.class ) )
+                            {
+                                if ( bean.getBeanClass( ).getCanonicalName( ).endsWith( "Producer" ) 
+                                        || bean.getBeanClass( ).getCanonicalName( ).endsWith( "Produces" ))
+                                {
+                                    Bean<?> realBean = beanManager.resolve( beanManager.getBeans( beanName ) );
+                                    Object beanInstance = beanManager.getReference( realBean, realBean.getTypes( ).iterator( ).next( ),
+                                            beanManager.createCreationalContext( realBean ) );
+                                    gwac.getBeanFactory( ).registerSingleton( beanName, beanInstance );
+                                }
+                                else
+                                {
+                                    Object beanInstance = beanManager.getReference( bean, bean.getBeanClass( ), beanManager.createCreationalContext( bean ) );
+                                    gwac.getBeanFactory( ).registerSingleton( beanName, beanInstance );
+                                }
+                            } 
+                            else if ( bean.getScope( ).isAssignableFrom( Dependent.class ) )
+                            {
+                                BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder.genericBeanDefinition( bean.getBeanClass( ) );
+                                beanDefinitionBuilder.setScope( ConfigurableBeanFactory.SCOPE_PROTOTYPE );
+                                gwac.registerBeanDefinition( beanName, beanDefinitionBuilder.getBeanDefinition( ) );
+                            }
+                        }
+                    }
+                } );
+            }
+            catch( Exception e )
+            {
+                AppLogService.error( "Error registering CDI beans in Root Spring Context Service {}", e.getMessage( ), e );
+            }
 
             XmlBeanDefinitionReader xmlReader = new XmlBeanDefinitionReader( gwac );
             xmlReader.loadBeanDefinitions( strContextFile );
